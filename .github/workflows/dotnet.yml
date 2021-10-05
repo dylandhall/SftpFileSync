@@ -43,3 +43,4 @@ jobs:
         args: output.zip
         # The release Id of the release to be targeted.
         releaseId: v1.0
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
