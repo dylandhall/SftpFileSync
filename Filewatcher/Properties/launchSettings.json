@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Filewatcher": {
+      "commandName": "Project",
+      "commandLineArgs": ""
+    }
+  }
+}
