@@ -34,12 +34,12 @@ jobs:
         # file_path: # optional, default is output.zip
         # Shows details about the result of running this action.
         # verbose: # optional
-    - name: Action Release
+    - name: github-action-publish-binaries
       # You may pin to the exact commit or the version.
-      # uses: yakuhzi/release-asset@f96c41c3fdc53a02ab20a60014725490f91702a3
-      uses: yakuhzi/release-asset@v1.2.3
+      # uses: skx/github-action-publish-binaries@b9ca5643b2f1d7371a6cba7f35333f1461bbc703
+      uses: skx/github-action-publish-binaries@release-2.0
       with:
-        # File to upload to the release
-        file: output.zip
-        # Path to changelog file
-        # changelog: # optional
+        # The pattern of files to upload
+        args: output.zip
+        # The release Id of the release to be targeted.
+        releaseId: v1.0
