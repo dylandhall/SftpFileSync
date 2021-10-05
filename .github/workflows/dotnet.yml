@@ -42,5 +42,6 @@ jobs:
         # The pattern of files to upload
         args: 'output.zip'
         # The release Id of the release to be targeted.
+        releaseId: 'v1.0'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
