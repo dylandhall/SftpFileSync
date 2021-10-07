@@ -23,8 +23,8 @@ jobs:
         Configuration: Release
     - name: Get vars
       run: |
-        echo ("runner_val=$env:RUNNER_TEMP" -replace "\", "/") >> $GITHUB_ENV
-        echo ("workspace_val=$env:GITHUB_WORKSPACE" -replace "\", "/") >> $GITHUB_ENV
+        echo ("runner_val=$env:RUNNER_TEMP" -replace "\\", "/") >> $GITHUB_ENV
+        echo ("workspace_val=$env:GITHUB_WORKSPACE" -replace "\\", "/") >> $GITHUB_ENV
       shell: powershell
       env:
         RUNNER_TEMP: ${{ runner.temp }}
