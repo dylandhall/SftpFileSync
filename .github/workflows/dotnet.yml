@@ -31,10 +31,10 @@ jobs:
         # Base directory; common prefix of all files and directories in the archive, relative to root_dir.
         # base_dir: # optional, default is .
         # Output file path. Supported extensions: zip, tar, tar.gz(tgz), tar.bz2(tbz2), tar.xz(txz)
-        file_path: $RUNNER_TEMP/build.zip # optional, default is output.zip
+        file_path: $GITHUB_WORKSPACE/build.zip # optional, default is output.zip
         # Shows details about the result of running this action.
         # verbose: # optional
     - name: Publish binaries
-      run: gh release upload 'v1.0' '$RUNNER_TEMP/build.zip' --clobber
+      run: gh release upload 'v1.0' $GITHUB_WORKSPACE/build.zip --clobber
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
