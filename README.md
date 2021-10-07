@@ -9,4 +9,4 @@ The use case this solves is developing on a windows computer, but hosting a webp
 
 It only supports login via password currently. It supports matching a root folder on client and host, and allows you to specify only certain subfolders to watch and update.
 
-It watches updates but only actually updates a finalised list after 50ms of inactivity, so it avoids attempting to create and delete a number of temporary files often used by editors. I would suggest matching the root folders by doing a git clone of the repository on both the host and client.
+It builds a set of updates and only uploads the final set to the server after a small period of inactivity. This avoids uploading any temporary working files, making it ideal for working in visual studio/code or jetbrains IDEs.
