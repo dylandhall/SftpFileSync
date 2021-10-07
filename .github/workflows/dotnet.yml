@@ -18,10 +18,9 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
-      run: dotnet build --no-restore --runtime win-x64
+      run: dotnet build --no-restore
       env:
             Configuration: Release
-            Runtime: win-x64
     - name: Archive Action
       # You may pin to the exact commit or the version.
       # uses: ihiroky/archive-action@e8b4644f992de8f7423e0bd7292c2e047ecf26ce
