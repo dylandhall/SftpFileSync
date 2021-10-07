@@ -35,10 +35,10 @@ jobs:
         # Shows details about the result of running this action.
         # verbose: # optional
       env:
-        GITHUB_WORKSPACE: ${GITHUB_WORKSPACE}
-        RUNNER_TEMP: ${RUNNER_TEMP}
+        GITHUB_WORKSPACE: "Test"
+        RUNNER_TEMP: ${env:RUNNER_TEMP}
     - name: Publish binaries
       run: gh release upload 'v1.0' "${{ env.RUNNER_TEMP }}/build.zip" --clobber
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        RUNNER_TEMP: ${RUNNER_TEMP}
+        RUNNER_TEMP: ${{ env.RUNNER_TEMP }}
