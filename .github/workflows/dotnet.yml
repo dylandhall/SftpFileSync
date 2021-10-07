@@ -21,8 +21,8 @@ jobs:
       run: dotnet build --no-restore
       env:
         Configuration: Release
-    - name: Get vars
-      run: Compress-Archive -Path $env:GITHUB_WORKSPACE\Filewatcher\bin\Release\net5.0-windows -DestinationPath $env:RUNNER_TEMP\build.zip
+    - name: Compress build output
+      run: Compress-Archive -Path $env:GITHUB_WORKSPACE\Filewatcher\bin\Release\net5.0-windows\* -DestinationPath $env:RUNNER_TEMP\build.zip
       shell: powershell
       env:
         RUNNER_TEMP: ${{ runner.temp }}
