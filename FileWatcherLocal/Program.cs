@@ -1,5 +1,4 @@
-﻿using Renci.SshNet;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,19 +8,18 @@ using System.Net.Mime;
 using System.Reflection;
 using System.Security;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 
-namespace Filewatcher
+namespace FileWatcherLocal
 {
     class Program
     {
         private static string _root = "";
         private static string _remoteRoot = "";
         
-        private static SftpClient _client;
         static async Task Main(string[] args)
         {
             var setttingsFile = Directory.GetCurrentDirectory() + @"\connectionSettings.json";
@@ -30,7 +28,7 @@ namespace Filewatcher
             {
                 try
                 {
-                    settings = JsonConvert.DeserializeObject<ConnectionSettings>(await File.ReadAllTextAsync(setttingsFile));
+                    settings = JsonSerializer.Deserialize<ConnectionSettings>(await File.ReadAllTextAsync(setttingsFile));
                 }
                 catch (Exception ex)
                 {
@@ -40,7 +38,6 @@ namespace Filewatcher
 
                 if (settings != null)
                 {
-                    Console.WriteLine($"Using settings for {settings.Username} on {settings.Host}, use -clear to reset");
                     Console.WriteLine($"Local root {settings.Root}, remote root {settings.RemoteRoot}");
                     if (settings.Folders.Any())
                         Console.WriteLine($"Watching subfolders {string.Join(", ", settings.Folders)}");
@@ -51,12 +48,6 @@ namespace Filewatcher
             {
                 settings = new ConnectionSettings();
                 
-                Console.WriteLine("Please enter host");
-                settings.Host = Console.ReadLine();
-                Console.WriteLine("Please enter username");
-                settings.Username = Console.ReadLine();
-                Console.WriteLine("Please enter password - stored in plain text, just hit enter to skip saving and ask every time");
-                settings.Password = GetPassword();
                 Console.WriteLine("Select root local folder");
                 settings.Root = Console.ReadLine().Trim('\\').Replace('/', '\\');
                 while (!Directory.Exists(settings.Root))
@@ -82,18 +73,12 @@ namespace Filewatcher
                 }
                 settings.Folders = folders.ToArray();
                 
-                await File.WriteAllTextAsync(setttingsFile, JsonConvert.SerializeObject(settings));
+                await File.WriteAllTextAsync(setttingsFile, JsonSerializer.Serialize(settings));
             }
 
             _remoteRoot = settings.RemoteRoot;
             _root = settings.Root;
-            if (string.IsNullOrEmpty(settings.Password))
-            {
-                Console.WriteLine("Please enter password");
-                settings.Password = GetPassword();
-            }
-            var connectionInfo = new ConnectionInfo(settings.Host, settings.Username, new PasswordAuthenticationMethod(settings.Username, settings.Password));
-
+            
             //async monitors for keypresses
             //ghetto
             Task.Run(() => MonitorKeypress());
@@ -110,11 +95,6 @@ namespace Filewatcher
             
                 try
                 {
-                    _client = new SftpClient(connectionInfo);
-                    _client.KeepAliveInterval = TimeSpan.FromSeconds(10);
-
-                    _client.Connect();
-
                     watchers.ForEach(watcher =>
                     {
                         watcher.IncludeSubdirectories = true;
@@ -126,7 +106,7 @@ namespace Filewatcher
                     });
                     while (!hasQuit)
                     {
-                        await Task.Delay(50);
+                        await Task.Delay(100);
                         await HandleEvents().ConfigureAwait(false);
                     }
                 }
@@ -154,8 +134,6 @@ namespace Filewatcher
                 {
                     watchers.ForEach(watcher => watcher.Dispose());
                     watchers = null;
-                    _client.Disconnect();
-                    _client.Dispose();
                 }
             }
         }
@@ -269,7 +247,7 @@ namespace Filewatcher
                 {
                     try
                     {
-                        _client.CreateDirectory(_remoteRoot + file[_root.Length..].Replace('\\', '/'));
+                        Directory.CreateDirectory(_remoteRoot + file[_root.Length..]);
                     }
                     catch(Exception ex)
                     {
@@ -282,11 +260,8 @@ namespace Filewatcher
             var createFileTasks =
                 toCreate.Select(file =>
                 Task.Run(() =>
-                {
-                    using (var fs = File.OpenRead(file))
-                    {
-                        _client.UploadFile(fs, _remoteRoot + file[_root.Length..].Replace('\\', '/'), canOverride: true);
-                    }
+                { 
+                    File.Copy(file, _remoteRoot + file[_root.Length..], true);
                 })).ToList();
 
             var deleteFileTasks = toDelete
@@ -296,13 +271,13 @@ namespace Filewatcher
                 {
                     try
                     {
-                        _client.DeleteFile(_remoteRoot + file[_root.Length..].Replace('\\', '/'));
+                        File.Delete(_remoteRoot + file[_root.Length..]);
                     } catch(Exception ex)
                     {
                         Console.WriteLine($"Error: {ex.Message} when deleting {file} as file, trying as folder");
                         try
                         {
-                            _client.DeleteDirectory(_remoteRoot + file[_root.Length..].Replace('\\', '/'));
+                            Directory.Delete(_remoteRoot + file[_root.Length..]);
                         } catch(Exception ex2) {
                             Console.WriteLine($"Error: {ex2.Message} when deleting {file} as folder");
                         }
@@ -410,11 +385,6 @@ namespace Filewatcher
     }
     internal class ConnectionSettings
     {
-        public string Host { get; set; }
-        public string Username { get; set; }
-        public string Password { get; set; }
-            
-            
         public string Root { get; set; }
         public string RemoteRoot { get; set; }
         public string[] Folders { get; set; }
