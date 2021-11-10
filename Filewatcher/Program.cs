@@ -5,14 +5,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.Mime;
-using System.Reflection;
-using System.Security;
 using System.Text;
-using System.Text.Json.Serialization;
-using System.Threading;
+using System.Text.Json;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 
 namespace Filewatcher
 {
@@ -30,7 +25,7 @@ namespace Filewatcher
             {
                 try
                 {
-                    settings = JsonConvert.DeserializeObject<ConnectionSettings>(await File.ReadAllTextAsync(setttingsFile));
+                    settings =  JsonSerializer.Deserialize<ConnectionSettings>(await File.ReadAllTextAsync(setttingsFile));
                 }
                 catch (Exception ex)
                 {
@@ -82,7 +77,7 @@ namespace Filewatcher
                 }
                 settings.Folders = folders.ToArray();
                 
-                await File.WriteAllTextAsync(setttingsFile, JsonConvert.SerializeObject(settings));
+                await File.WriteAllTextAsync(setttingsFile, JsonSerializer.Serialize(settings));
             }
 
             _remoteRoot = settings.RemoteRoot;
