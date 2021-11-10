@@ -32,3 +32,15 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         RUNNER_TEMP: ${{ runner.temp }}
+    - name: Compress build output local
+      run: Compress-Archive -Path $env:GITHUB_WORKSPACE\FilewatcherLocal\bin\Release\net5.0-windows\* -DestinationPath $env:RUNNER_TEMP\build-local.zip
+      shell: powershell
+      env:
+        RUNNER_TEMP: ${{ runner.temp }}
+        GITHUB_WORKSPACE: ${{ github.workspace }}
+    - name: Publish binaries
+      run: gh release upload 'v1.0' "${{ env.RUNNER_TEMP }}\\build-local.zip" --clobber
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        RUNNER_TEMP: ${{ runner.temp }}
+
