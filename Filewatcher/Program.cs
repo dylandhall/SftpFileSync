@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Filewatcher
@@ -121,7 +122,7 @@ namespace Filewatcher
                     });
                     while (!hasQuit)
                     {
-                        await Task.Delay(50);
+                        await Task.Delay(_eventTimeout);
                         await HandleEvents().ConfigureAwait(false);
                     }
                 }
@@ -136,14 +137,13 @@ namespace Filewatcher
                         time = time.Replace(c, '-');
                     }
                     File.WriteAllLines($"C:\\temp\\filewatcher-error-{time}.txt", new[] { ex.Message, Environment.NewLine, ex.StackTrace });
-                    if (onProbation)
+                    if (_onProbation)
                     {
-                        UpdateEvents = new ConcurrentBag<FileEvent>();
-                        AlternateUpdateEvents = new ConcurrentBag<FileEvent>();
-                        onProbation = false;
+                        _updateEvents = new ConcurrentBag<FileEvent>();
+                        _onProbation = false;
                     } 
                     else
-                        onProbation = true;
+                        _onProbation = true;
                 }
                 finally
                 {
@@ -170,29 +170,27 @@ namespace Filewatcher
             hasQuit = true;
         }
 
-        private static bool clearingCollections = false;
+        private static bool _clearingCollections = false;
         private static async Task HandleEvents()
         {
             var now = DateTimeOffset.UtcNow;
-            var timeout = TimeSpan.FromMilliseconds(100);
-
-            var eToHandle = UpdateEvents.Where(a => !a.Handled && now - a.Time > timeout).ToList();
+            var timeout = _eventTimeout;
 
             //if events have occurred recently, they might be part of a series of updates that hasn't completed yet.
             //we'll wait until we have a brief period of inactivity before we process the events.
 
             bool IsEventTooRecent(FileEvent fileEvent) => now - fileEvent.Time < timeout;
+            if (_updateEvents.Any(IsEventTooRecent)) return;
 
-            if (eToHandle.Any(IsEventTooRecent))
-                return;
-
+            var eToHandle = _updateEvents.Where(a => !a.Handled && !IsEventTooRecent(a)).ToList();
+    
             eToHandle.ForEach(SetHandled);
 
             var dirToCreate = new List<string>();
             var toCreate = new List<string>();
             var toDelete = new List<string>();
 
-            foreach (var e in eToHandle.OrderBy(a => a.Time))
+            foreach (var e in eToHandle.OrderBy(a => a.Order))
             {
                 if (e.IsRename)
                 {
@@ -235,13 +233,19 @@ namespace Filewatcher
                 }
             }
 
-            if (UpdateEvents.Count > 200)
+            if (_updateEvents.Count > 200)
             {
-                clearingCollections = true;
-                var old = UpdateEvents;
-                UpdateEvents = new ConcurrentBag<FileEvent>();
-                clearingCollections = false;
-                old.Where(a => !a.Handled).ToList().ForEach(a => UpdateEvents.Add(a));
+                _clearingCollections = true;
+                var old = _updateEvents;
+                _updateEvents = new ConcurrentBag<FileEvent>();
+                await Task.Delay(10);
+                old.Where(a => !a.Handled).OrderBy(a => a.Order).Select((a, i) =>
+                {
+                    a.Order = i;
+                    return a;
+                }).ToList().ForEach(_updateEvents.Add);
+                if (_updateEvents.Any()) _operationOrder = _updateEvents.Max(a => a.Order);                
+                _clearingCollections = false;
             }
 
             string asString(List<string> s) => string.Join(", ", s.Distinct().ToList());
@@ -313,27 +317,27 @@ namespace Filewatcher
             Console.WriteLine($"Done in {watch.Elapsed}");
             Console.WriteLine();
 
-            onProbation = false;
+            _onProbation = false;
         }
 
         private static void SetHandled(FileEvent fileEvent) => fileEvent.Handled = true;
         
 
-        private static ConcurrentBag<FileEvent> UpdateEvents = new();
-        private static ConcurrentBag<FileEvent> AlternateUpdateEvents = new();
+        private static ConcurrentBag<FileEvent> _updateEvents = new();
 
         //if we have an error, then it's on probation - it'll try the events again and flush them if we see another error
         //allows us to retry in case it was a network error, but also flush events in case it was one of the events that caused the error
-        private static bool  onProbation = false;
-
+        private static bool  _onProbation = false;
+        private static long _operationOrder = 0;
+        private static readonly TimeSpan _eventTimeout = TimeSpan.FromMilliseconds(50);
         private static void Watcher_Renamed(object sender, RenamedEventArgs e)
         {
             var now = DateTimeOffset.Now;
-            while (clearingCollections)
+            while (_clearingCollections)
             {
                 Task.Delay(5).Wait();
             }
-            UpdateEvents.Add(new FileEvent(false, now, e));
+            _updateEvents.Add(new FileEvent(false, now, e, Interlocked.Increment(ref _operationOrder)));
             Console.WriteLine($" -- {e.ChangeType}: {e.OldFullPath} to {e.FullPath}");
         }
 
@@ -341,11 +345,11 @@ namespace Filewatcher
         {
             if (e.ChangeType == WatcherChangeTypes.Changed && Directory.Exists(e.FullPath)) return;
             var now = DateTimeOffset.Now;
-            while (clearingCollections)
+            while (_clearingCollections)
             {
                 Task.Delay(5).Wait();
             }
-            UpdateEvents.Add(new FileEvent(false, now, e));
+            _updateEvents.Add(new FileEvent(false, now, e, Interlocked.Increment(ref _operationOrder)));
             Console.WriteLine($" -- {e.ChangeType}: {e.FullPath}");
         }
         
@@ -385,22 +389,25 @@ namespace Filewatcher
 
     internal class FileEvent
     {
+        public long Order { get; set; }
         public bool Handled { get; set; }
         public DateTimeOffset Time { get; }
         public FileSystemEventArgs Event { get; }
         public RenamedEventArgs RnEvent { get; }
         public bool IsRename => RnEvent != null;
-        public FileEvent(bool handled, DateTimeOffset time, FileSystemEventArgs fileEvent)
+        public FileEvent(bool handled, DateTimeOffset time, FileSystemEventArgs fileEvent, long order)
         {
             Handled = handled;
             Time = time;
             Event = fileEvent;
+            Order = order;
         }
-        public FileEvent(bool handled, DateTimeOffset time, RenamedEventArgs fileEvent)
+        public FileEvent(bool handled, DateTimeOffset time, RenamedEventArgs fileEvent, long order)
         {
             Handled = handled;
             Time = time;
             RnEvent = fileEvent;
+            Order = order;
         }
     }
     internal class ConnectionSettings
